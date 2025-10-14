@@ -1,0 +1,68 @@
+# 🚀 Workflow para construir y desplegar un proyecto Node (Vite, React, etc.) en GitHub Pages
+name: Deploy Node app to GitHub Pages
+
+on:
+  # ▶️ Permite ejecutar el flujo manualmente desde la pestaña "Actions"
+  workflow_dispatch:
+
+# 🔐 Permisos necesarios para poder publicar en GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# ⚙️ Solo permite un despliegue activo al mismo tiempo
+# Si hay otro en curso, se saltan los intermedios (pero no se cancela el actual)
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  # 🏗️ Job de construcción del proyecto
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # 📥 Descarga el código fuente del repositorio
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ⚙️ Configura Node.js (usa la versión que uses localmente)
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20 # Cambia si usas otra versión
+          cache: "npm" # Usa caché para acelerar builds posteriores
+
+      # 📦 Instala las dependencias
+      - name: Install dependencies
+        run: npm i # usa `npm ci` por rapidez y consistencia (usa package-lock.json)
+
+      # 🧱 Construye la aplicación
+      - name: Build project
+        run: npm run build # genera los archivos estáticos (por defecto en ./dist)
+
+      # 🔍 (Opcional) Verifica que el build funciona en modo preview
+      # Puedes eliminarlo si no es necesario
+      # - name: Preview build
+      #   run: npm run preview -- --port=4173 &
+
+      # 📤 Sube el artefacto (carpeta con el resultado del build) para el job de despliegue
+      # Ajusta la ruta si tu build genera en otro sitio (por ejemplo: ./build o ./out)
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+  # 🚀 Job de despliegue en GitHub Pages
+  deploy:
+    environment:
+      name: github-pages
+      # 🔗 La URL se rellenará automáticamente al desplegar
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      # 📦 Descarga y publica el artefacto generado en el paso anterior
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
